@@ -127,13 +127,55 @@ def test_measure(preds,trues,tokens,lengths,id2tag):
 
     return f1, precision, recall, mistake, mistake_num
 
+def find_bio_error_num(tags_list):
+    error_num = []
+    for i, tags in enumerate(tags_list):
+        if find_bio_error_index(tags)!=[]:
+            error_num.append(i)
+    return error_num
+
+def find_bio_error_index(tags):
+    error_index,ner_index = [],[]
+
+    pre_bio,pre_tag = '',''
+    is_ner,is_inconsistent = False,False
+
+    for i, tag in enumerate(tags):
+        tag_content = tag.split('-')
+        # 前是O就直接I的錯誤
+        if tag_content[0] == 'I' and (pre_bio =='O'):
+              error_index.append(i)
+
+        # 如果是B開頭就進ner的判斷
+        if tag_content[0] == 'B':
+              is_ner = True
+              ner_index.append(i) # 把ner B的index記錄起來
+        # ner中且當下是I就進判斷
+        if is_ner and tag_content[0]=='I':
+              ner_index.append(i) # 把ner I的index記錄起來
+              if tag_content[1] != pre_tag:# 前一個tag跟當下的tag不一樣
+                  is_inconsistent = True
+        # inconsistent且脫離ner範圍，或是當下是tags的最後一個元素就把ner加入error
+        if is_inconsistent:
+              if tag_content[0]=='O' or i == (len(tags)-1):
+                  error_index = error_index + ner_index
+                  ner_index = []
+                  is_ner = False
+                  is_inconsistent = False
+
+        if tag_content[0] != 'O':
+            pre_tag = tag_content[1]
+        pre_bio = tag_content[0]
+
+    return error_index
+
 # 輸出錯誤結果
-def output_mistake_result(precision, recall, f1, mistake, mistake_num, result_name, result_path):
+def output_mistake_result(precision, recall, f1, mistake, mistake_num, result_path, result_file_name):
     current_time = datetime.now()
     timestamp = current_time.strftime("%Y%m%d%H%M%S")
     unique_id = uuid.uuid4().hex
 
-    file_name = f"{result_name}_{timestamp}_{unique_id}.json"
+    file_name = f"{result_file_name}_{timestamp}_{unique_id}.json"
 
     result_data=[]
     result_item = {
@@ -206,14 +248,20 @@ def output_correction_data(mistake, file_name):
         json.dump(result_data, f, indent=4, ensure_ascii=False)
 
 # 輸出"{token}\t{label}\n"格式的檔案
-def output_predict(tokens, tags, result_path, file_name):
+def output_predict(tokens, tags, result_path, result_file_name):
+    current_time = datetime.now()
+    timestamp = current_time.strftime("%Y%m%d%H%M%S")
+    unique_id = uuid.uuid4().hex
+
+    file_name = f"{result_file_name}_{timestamp}_{unique_id}.json"
+
     merged_results = []
     for i in range(len(tags)):
         merged_sentence = []
         for j in range(len(tags[i])):
             merged_sentence.append((tokens[i][j], tags[i][j]))
         merged_results.append(merged_sentence)
-    with open(result_path+file_name, 'w', encoding='utf-8') as output_file:
+    with open(result_path + file_name, 'w', encoding='utf-8') as output_file:
         for sentence in merged_results:
             for token, label in sentence:
                 output_file.write(f"{token}\t{label}\n")

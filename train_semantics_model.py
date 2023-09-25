@@ -14,11 +14,11 @@ save_models_path = 'save_models/label_semantics_model/'
 result_path = 'result/'
 
 label_file = 'label_file/label_rocling.json'
-train_file = 'data/train.json'
-dev_file = 'data/test.json'
-correction_data_file = 'data/correction_data_file.json'
+train_file = 'data/train/train.json'
+dev_file = 'data/train/test.json'
+correction_data_file = 'data/train/correction_data_file.json'
 
-result_name = 'label_semantics'
+mistake_file_name = 'label_semantics'
 
 use_dev_data = True
 use_test_data = True
@@ -73,7 +73,7 @@ def print_all_labels_count(train_labels, dev_labels, test_labels):
     for label in label_counts:
         print(label + ": " + str(label_counts[label]))
 
-# ------------------資料載入-------------------
+# ------------------載入資料-------------------
 # 資料集分割的比例
 train_ratio = 0.8
 dev_ratio = 0.1
@@ -90,10 +90,11 @@ epochs = 5
 end_lr = 10
 num_iter = 100
 
-# ------------------把文本轉換為BERT模型的輸入格式，並創建train、dev、test的DataLoader-------------------
+# ------------------載入BERT模型與標籤資料-------------------
 tokenizer = BertTokenizer.from_pretrained(base_path)
 tag2id,id2tag,short_labels = trans2id(label_file)
 
+# ------------------把文本轉換為BERT模型的輸入格式，並創建DataLoader-------------------
 train_ids,train_token_type_ids,train_attention_masks,train_tags,train_lengths = gen_features(train_tokens,train_labels,tokenizer,tag2id,max_len)
 train_ids = torch.tensor([item.cpu().detach().numpy() for item in train_ids]).squeeze()
 train_tags = torch.tensor(train_tags)
@@ -120,7 +121,6 @@ if use_test_data:
     test_masks = torch.tensor([item.cpu().detach().numpy() for item in test_attention_masks]).squeeze()
     test_token_type_ids = torch.tensor([item.cpu().detach().numpy() for item in test_token_type_ids]).squeeze()
     test_data = TensorDataset(test_ids, test_masks,test_token_type_ids, test_tags)
-    test_sampler = RandomSampler(valid_data)
     test_dataloader = DataLoader(test_data, batch_size=bs)
 
 # ------------------模型設定-------------------
@@ -128,11 +128,11 @@ acc_scores,recall_scores,f1_scores = [],[],[]
 
 fewshot = FewShot_NER(base_path,tag2id,bs,label_file)
 loss_function=CrossEntropyLoss()
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 optimizer = torch.optim.Adam(fewshot.parameters(), lr = 1e-5)
 total_steps = len(train_dataloader) * epochs
 scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps = 0, num_training_steps = total_steps)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 fewshot.to(device)
 
 # ------------------訓練-------------------
@@ -215,11 +215,10 @@ if use_test_data:
 
     # ------------------輸出錯誤結果與correction model需要的資料-------------------
     print(len(test_mistake_num))
-    output_mistake_result(test_precision,test_recall,test_f1,test_mistake, test_mistake_num, result_name, result_path)
+    output_mistake_result(test_precision,test_recall,test_f1,test_mistake, test_mistake_num, result_path, mistake_file_name)
     output_correction_data(test_mistake, correction_data_file)
 
-# ------------------繪製結果折線圖-------------------
-if use_dev_data:
+    # ------------------繪製結果折線圖-------------------
     plt.plot(range(epochs+1), acc_scores, label='PRECISION')
     plt.plot(range(epochs+1), recall_scores, label='RECALL')
     plt.plot(range(epochs+1), f1_scores, label='F1')
