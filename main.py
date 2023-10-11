@@ -2,11 +2,8 @@ from package.model import FewShot_NER
 from package.utils import *
 
 from transformers import BertTokenizer
-from transformers import get_linear_schedule_with_warmup
-from collections import Counter
 import torch
-from torch.nn import CrossEntropyLoss
-from torch.utils.data import TensorDataset, RandomSampler, DataLoader
+from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 import copy
 
@@ -15,7 +12,7 @@ save_models_path = 'save_models/label_correction_model/'
 
 label_file = 'label_file/label_rocling.json'
 test_file = 'data/test/test.txt'
-# test_file = 'data/test/test_answer.txt' #這是有答案版的txt
+# test_file = 'data/test/test_answer.txt' # 這是有答案版的txt
 LSM_file = 'save_models/label_semantics_model/LSM.pth' # 記得在訓練好LSM後把這邊改成訓練好的模型檔案
 LCM_file = 'save_models/label_correction_model/LCM.pth' # 記得在訓練好LCM後把這邊改成訓練好的模型檔案
 
@@ -197,7 +194,7 @@ if is_answer:
     # ------------------執行並紀錄LSM+規則式數據-------------------
     rule_based_pre = copy.deepcopy(test_pre)
     rule_based_pre = rule_based_filter_alone_I_tags(rule_based_pre, bio_tags, tag2id)
-    rule_based_pre = rule_based_consistent_BI_tags(rule_based_pre, tag2id)
+    rule_based_pre = rule_based_consistent_BI_tags(rule_based_pre, tag2id, id2tag)
 
     rule_based_f1, rule_based_precision, rule_based_recall, rule_based_mistake, rule_based_mistake_num = test_measure(rule_based_pre,test_true,test_tokens,test_lengths,id2tag)
     precesion_scores.append(rule_based_precision)
