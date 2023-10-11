@@ -50,6 +50,21 @@ def gen_features(tokens,labels,tokenizer,tag2id,max_len):
         attention_masks.append(attention_mask)
     return input_ids,token_type_ids,attention_masks,tags,lengths
 
+def no_labels_gen_features(tokens, tokenizer, max_len):
+    input_ids, token_type_ids, attention_masks, lengths = [], [], [], []
+    for i, token in enumerate(tokens):
+        sentence = ''.join(token)
+        lengths.append(len(sentence))
+        if len(token) >= max_len - 2:
+            token = token[0:max_len - 2]
+
+        inputs = tokenizer.encode_plus(sentence, max_length=max_len, pad_to_max_length=True, return_tensors='pt')
+        input_id, token_type_id, attention_mask = inputs['input_ids'], inputs['token_type_ids'], inputs['attention_mask']
+        input_ids.append(input_id)
+        token_type_ids.append(token_type_id)
+        attention_masks.append(attention_mask)
+    return input_ids, token_type_ids, attention_masks, lengths
+
 def get_entities(tags):
     start, end = -1, -1
     prev = 'O'
@@ -266,6 +281,26 @@ def output_predict(tokens, tags, result_path, result_file_name):
             for token, label in sentence:
                 output_file.write(f"{token}\t{label}\n")
             output_file.write("\n")
+
+# 輸出"{token}\t{label}\n"格式的檔案
+def output_predict(tokens, tags, result_path, result_file_name):
+    current_time = datetime.now()
+    timestamp = current_time.strftime("%Y%m%d%H%M%S")
+    unique_id = uuid.uuid4().hex
+
+    file_name = f"{result_file_name}_{timestamp}_{unique_id}.txt"
+
+    merged_results = []
+    for i in range(len(tags)):
+        merged_sentence = []
+        for j in range(len(tokens[i])):
+            merged_sentence.append((tokens[i][j], tags[i][j]))
+        merged_results.append(merged_sentence)
+    with open(result_path + file_name, 'w', encoding='utf-8') as output_file:
+        for sentence in merged_results:
+            for token, label in sentence:
+                output_file.write(f"{token}\t{label}\n")
+            output_file.write("\n")
             
 def rule_based_filter_alone_I_tags(tags, bio_labels, tag2id):
     for tag_sequence in tags:
@@ -283,7 +318,10 @@ def rule_based_consistent_BI_tags(tags, tag2id, id2tag):
         pre_tag = ''
         is_ner = False
         for i, tag_id in enumerate(tag_sequence):
-            tag_content = id2tag[tag_id].split('-')
+            if id2tag[tag_id] == 'O':
+                tag_content = 'O'
+            else:
+                tag_content = id2tag[tag_id].split('-')
             if tag_content[0] == 'B':
                 is_ner = True
                 pre_tag = tag_content[1]

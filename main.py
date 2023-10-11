@@ -12,14 +12,15 @@ import copy
 
 base_path = 'berts/chinese-roberta-wwm-ext'
 save_models_path = 'save_models/label_correction_model/'
-result_path = 'result/'
 
 label_file = 'label_file/label_rocling.json'
 test_file = 'data/test/test.txt'
 # test_file = 'data/test/test_answer.txt' #這是有答案版的txt
-LSM_file = 'save_models/label_semantics_model/label_semantics_model.pth' # 記得在訓練好LSM後把這邊改成訓練好的模型檔案
-LCM_file = 'save_models/label_correction_model/label_correction_model.pth' # 記得在訓練好LCM後把這邊改成訓練好的模型檔案
+LSM_file = 'save_models/label_semantics_model/LSM.pth' # 記得在訓練好LSM後把這邊改成訓練好的模型檔案
+LCM_file = 'save_models/label_correction_model/LCM.pth' # 記得在訓練好LCM後把這邊改成訓練好的模型檔案
 
+# 輸出結果的資料夾和檔名，默認輸出.txt，要改的話要去utils.py改函式內容
+result_path = 'result/'
 result_file = 'FT_three_stage'
 
 is_answer = False # 設True的話會依test集中的答案計算數據，反之代表test集沒有答案，此次處理為會輸出預測結果
@@ -53,21 +54,28 @@ else:
 # ------------------載入BERT模型與標籤資料-------------------
 tokenizer = BertTokenizer.from_pretrained(base_path)
 tag2id,id2tag,short_labels = trans2id(label_file)
-bio_labels = [value[0] for value in id2tag.values()]
+bio_tags = [value[0] for value in id2tag.values()]
 
 # ------------------模型參數-------------------
 max_len = 512
 bs = 32
 
 # ------------------把文本轉換為BERT模型的輸入格式，並創建DataLoader-------------------
-test_ids,test_token_type_ids,test_attention_masks,test_tags,test_lengths = gen_features(test_tokens,test_labels,tokenizer,tag2id,max_len)
-test_ids = torch.tensor([item.cpu().detach().numpy() for item in test_ids]).squeeze()
 if is_answer:
+    test_ids,test_token_type_ids,test_attention_masks,test_tags,test_lengths = gen_features(test_tokens,test_labels,tokenizer,tag2id,max_len)
     test_tags = torch.tensor(test_tags)
-test_masks = torch.tensor([item.cpu().detach().numpy() for item in test_attention_masks]).squeeze()
-test_token_type_ids = torch.tensor([item.cpu().detach().numpy() for item in test_token_type_ids]).squeeze()
-test_data = TensorDataset(test_ids, test_masks,test_token_type_ids, test_tags)
-test_dataloader = DataLoader(test_data, batch_size=bs)
+    test_ids = torch.tensor([item.cpu().detach().numpy() for item in test_ids]).squeeze()
+    test_masks = torch.tensor([item.cpu().detach().numpy() for item in test_attention_masks]).squeeze()
+    test_token_type_ids = torch.tensor([item.cpu().detach().numpy() for item in test_token_type_ids]).squeeze()
+    test_data = TensorDataset(test_ids, test_masks,test_token_type_ids, test_tags)
+    test_dataloader = DataLoader(test_data, batch_size=bs)
+else:
+    test_ids, test_token_type_ids, test_attention_masks, test_lengths = no_labels_gen_features(test_tokens, tokenizer, max_len)
+    test_ids = torch.tensor([item.cpu().detach().numpy() for item in test_ids]).squeeze()
+    test_masks = torch.tensor([item.cpu().detach().numpy() for item in test_attention_masks]).squeeze()
+    test_token_type_ids = torch.tensor([item.cpu().detach().numpy() for item in test_token_type_ids]).squeeze()
+    test_data = TensorDataset(test_ids, test_masks, test_token_type_ids)
+    test_dataloader = DataLoader(test_data, batch_size=bs)
 
 # ------------------模型設定-------------------
 if is_answer:
@@ -114,20 +122,29 @@ if is_answer:
 tags = trans2label(id2tag,test_pre,test_lengths)
 mistake_num = find_bio_error_num(tags)
 corrected_tokens = [test_tokens[i] for i in mistake_num]
-corrected_labels = [test_labels[i] for i in mistake_num]
+if is_answer:
+    corrected_labels = [test_labels[i] for i in mistake_num]
 
 # ------------------模型參數-------------------
 max_len = 512
 bs = 32
 
 # ------------------把文本轉換為BERT模型的輸入格式，並創建DataLoader-------------------
-corrected_ids,corrected_token_type_ids,corrected_attention_masks,corrected_tags,corrected_lengths = gen_features(corrected_tokens,corrected_labels,tokenizer,tag2id,max_len)
-corrected_ids = torch.tensor([item.cpu().detach().numpy() for item in corrected_ids]).squeeze()
-corrected_tags = torch.tensor(corrected_tags)
-corrected_masks = torch.tensor([item.cpu().detach().numpy() for item in corrected_attention_masks]).squeeze()
-corrected_token_type_ids = torch.tensor([item.cpu().detach().numpy() for item in corrected_token_type_ids]).squeeze()
-corrected_data = TensorDataset(corrected_ids, corrected_masks, corrected_token_type_ids, corrected_tags)
-corrected_dataloader = DataLoader(corrected_data, batch_size=bs)
+if is_answer:
+    corrected_ids,corrected_token_type_ids,corrected_attention_masks,corrected_tags,corrected_lengths = gen_features(corrected_tokens,corrected_labels,tokenizer,tag2id,max_len)
+    corrected_ids = torch.tensor([item.cpu().detach().numpy() for item in corrected_ids]).squeeze()
+    corrected_tags = torch.tensor(corrected_tags)
+    corrected_masks = torch.tensor([item.cpu().detach().numpy() for item in corrected_attention_masks]).squeeze()
+    corrected_token_type_ids = torch.tensor([item.cpu().detach().numpy() for item in corrected_token_type_ids]).squeeze()
+    corrected_data = TensorDataset(corrected_ids, corrected_masks, corrected_token_type_ids, corrected_tags)
+    corrected_dataloader = DataLoader(corrected_data, batch_size=bs)
+else:
+    corrected_ids,corrected_token_type_ids,corrected_attention_masks,corrected_lengths = no_labels_gen_features(corrected_tokens,tokenizer,max_len)
+    corrected_ids = torch.tensor([item.cpu().detach().numpy() for item in corrected_ids]).squeeze()
+    corrected_masks = torch.tensor([item.cpu().detach().numpy() for item in corrected_attention_masks]).squeeze()
+    corrected_token_type_ids = torch.tensor([item.cpu().detach().numpy() for item in corrected_token_type_ids]).squeeze()
+    corrected_data = TensorDataset(corrected_ids, corrected_masks, corrected_token_type_ids)
+    corrected_dataloader = DataLoader(corrected_data, batch_size=bs)
 
 # ------------------LCM-------------------
 corrected_pre,corrected_true = [],[]
@@ -137,13 +154,17 @@ fewshot.eval()
 
 for batch in corrected_dataloader:
 
-    input_ids,masks,token_type_ids,labels= (i.to(device) for i in batch)
+    if is_answer:
+        input_ids,masks,token_type_ids,labels= (i.to(device) for i in batch)
+    else:
+        input_ids,masks,token_type_ids= (i.to(device) for i in batch)
 
     with torch.no_grad():
         matrix_embeddings,output_indexs = fewshot({"input_ids":input_ids,"attention_mask":masks,"token_type_ids":token_type_ids},flag = True)
 
     corrected_pre.extend(output_indexs.detach().cpu().numpy().tolist())
-    corrected_true.extend(labels.detach().cpu().numpy().tolist())
+    if is_answer:
+        corrected_true.extend(labels.detach().cpu().numpy().tolist())
 
 # ------------------替換校正內容-------------------
 replaced_pre = copy.deepcopy(test_pre)
@@ -155,15 +176,14 @@ for index in mistake_num:
         replaced_pre[index][error_index] = corrected_pre[num][error_index]
     num+=1
 
-
 # ------------------規則式-------------------
-three_stage_pre = rule_based_filter_alone_I_tags(replaced_pre, bio_labels, tag2id)
-three_stage_pre = rule_based_consistent_BI_tags(replaced_pre, bio_labels, tag2id)
+three_stage_pre = rule_based_filter_alone_I_tags(replaced_pre, bio_tags, tag2id)
+three_stage_pre = rule_based_consistent_BI_tags(replaced_pre, tag2id, id2tag)
 
 # ------------------輸出預測結果-------------------
 if not is_answer:
-    output_predict(test_tokens,three_stage_pre,result_path, result_file)
-
+    tag_sequences = trans2label(id2tag,three_stage_pre,test_lengths)# pre會是id，要先轉成tag後再輸出
+    output_predict(test_tokens,tag_sequences ,result_path, result_file)
 
 # 如果test集有答案的話
 # 這邊會執行並記錄消融實驗的結果
@@ -176,7 +196,7 @@ if is_answer:
 
     # ------------------執行並紀錄LSM+規則式數據-------------------
     rule_based_pre = copy.deepcopy(test_pre)
-    rule_based_pre = rule_based_filter_alone_I_tags(rule_based_pre, bio_labels, tag2id)
+    rule_based_pre = rule_based_filter_alone_I_tags(rule_based_pre, bio_tags, tag2id)
     rule_based_pre = rule_based_consistent_BI_tags(rule_based_pre, tag2id)
 
     rule_based_f1, rule_based_precision, rule_based_recall, rule_based_mistake, rule_based_mistake_num = test_measure(rule_based_pre,test_true,test_tokens,test_lengths,id2tag)
