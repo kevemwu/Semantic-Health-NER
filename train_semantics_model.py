@@ -72,6 +72,7 @@ def print_all_labels_count(train_labels, dev_labels, test_labels):
     print("-------------所有標籤數量-------------")
     for label in label_counts:
         print(label + ": " + str(label_counts[label]))
+    print("--------------------------------")
 
 # ------------------載入資料-------------------
 # 資料集分割的比例
@@ -84,7 +85,7 @@ train_tokens,train_labels, dev_tokens, dev_labels, test_tokens, test_labels = lo
 print_all_labels_count(train_labels, dev_labels, test_labels)
 
 # ------------------模型參數-------------------
-max_len = 512
+max_len = 128
 bs = 32
 epochs = 5
 end_lr = 10

@@ -15,7 +15,7 @@ result_path = 'result/'
 
 label_file = 'label_file/label_rocling.json'
 train_file = 'data/train/correction_data_file.json'
-LSM_file = 'save_models/label_semantics_model/label_semantics_model.pth' # 記得在訓練好LSM後把這邊改成訓練好的模型檔案
+LSM_file = 'save_models/label_semantics_model/LSM.pth' # 記得在訓練好LSM後把這邊改成訓練好的模型檔案
 
 mistake_file_name = 'label_correction'
 
@@ -31,9 +31,9 @@ def load_data(paths, train_ratio, dev_ratio):
     arr = []
     for path in paths:
         with open(path, encoding="utf-8") as f:
-            for line in f:
-                data = json.loads(line)
-                arr.append(data)
+            data = json.loads(f.read())
+            for item in data:
+                arr.append(item)
 
     train_tokens,train_labels, dev_tokens, dev_labels, test_tokens, test_labels = [], [], [], [], [], []
     total_samples = len(arr)
@@ -48,14 +48,14 @@ def load_data(paths, train_ratio, dev_ratio):
     dev_data = arr[train_samples:train_samples+dev_samples]
     test_data = arr[train_samples+dev_samples:]
 
-    train_tokens = [data['sentence'] for data in train_data]
-    train_labels = [data['character_label'] for data in train_data]
+    train_tokens = [data['Sentence'] for data in train_data]
+    train_labels = [data['Full True Labels'] for data in train_data]
 
-    dev_tokens = [data['sentence'] for data in dev_data]
-    dev_labels = [data['character_label'] for data in dev_data]
+    dev_tokens = [data['Sentence'] for data in dev_data]
+    dev_labels = [data['Full True Labels'] for data in dev_data]
 
-    test_tokens = [data['sentence'] for data in test_data]
-    test_labels = [data['character_label'] for data in test_data]
+    test_tokens = [data['Sentence'] for data in test_data]
+    test_labels = [data['Full True Labels'] for data in test_data]
 
     print("--------------------------------")
     print("訓練集大小：", len(train_tokens))
@@ -71,6 +71,7 @@ def print_all_labels_count(train_labels, dev_labels, test_labels):
     print("-------------所有標籤數量-------------")
     for label in label_counts:
         print(label + ": " + str(label_counts[label]))
+    print("--------------------------------")
 
 # ------------------載入資料-------------------
 # 資料集分割的比例
@@ -83,7 +84,7 @@ train_tokens,train_labels, dev_tokens, dev_labels, test_tokens, test_labels = lo
 print_all_labels_count(train_labels, dev_labels, test_labels)
 
 # ------------------模型參數-------------------
-max_len = 512
+max_len = 128
 bs = 32
 epochs = 5
 end_lr = 10
