@@ -1,3 +1,4 @@
+import sys
 from package.model import FewShot_NER
 from package.utils import *
 
@@ -19,8 +20,12 @@ LSM_file = 'save_models/label_semantics_model/LSM.pth' # 記得在訓練好LSM�
 
 mistake_file_name = 'label_correction'
 
+# 如果use_X_data設定了True，對應的資料集就要分配一定比例的資料，否則會出錯
 use_dev_data = True
 use_test_data = False
+# 資料集分割的比例，只須設定train和dev，剩下的會自動分配給test
+train_ratio = 0.9
+dev_ratio = 0.1
 
 # 註：這邊要注意資料集的格式
 # 因為train集是json檔
@@ -74,11 +79,13 @@ def print_all_labels_count(train_labels, dev_labels, test_labels):
     print("--------------------------------")
 
 # ------------------載入資料-------------------
-# 資料集分割的比例
-train_ratio = 0.9
-dev_ratio = 0.1
-
 train_tokens,train_labels, dev_tokens, dev_labels, test_tokens, test_labels = load_data([train_file], train_ratio, dev_ratio)
+if use_dev_data and len(dev_tokens)==1:
+    print("use_dev_data設為True，dev_ratio必須不為0")
+    sys.exit()
+if use_test_data and len(test_tokens)==1:
+    print("use_test_data設為True，必須分配給test部分資料")
+    sys.exit()
 
 # ------------------計算各標籤的數量-------------------
 print_all_labels_count(train_labels, dev_labels, test_labels)
@@ -124,7 +131,7 @@ if use_test_data:
     test_dataloader = DataLoader(test_data, batch_size=bs)
 
 # ------------------模型設定-------------------
-acc_scores,recall_scores,f1_scores = [],[],[]
+precesion_scores,recall_scores,f1_scores = [],[],[]
 
 fewshot = FewShot_NER(base_path,tag2id,bs,label_file)
 loss_function=CrossEntropyLoss()
@@ -182,10 +189,10 @@ for i in range(epochs):
 
         f1, precision, recall = measure(predictions,true_labels,dev_lengths,id2tag)
 
-        acc_scores.append(precision)
+        precesion_scores.append(precision)
         recall_scores.append(recall)
         f1_scores.append(f1)
-        print('epoch {} : Acc : {},Recall : {},F1 :{}'.format(i,precision,recall,f1))
+        print('epoch {} dev : Acc : {},Recall : {},F1 :{}'.format(i,precision,recall,f1))
 
         if F1_score < f1:
             F1_score = f1
@@ -210,7 +217,7 @@ if use_test_data:
     # ------------------test集數據-------------------
     test_f1, test_precision, test_recall, test_mistake, test_mistake_num = test_measure(test_pre,test_true,test_tokens,test_lengths,id2tag)
     print('Test Acc : {},Recall : {},F1 :{}'.format(test_precision,test_recall,test_f1))
-    acc_scores.append(test_precision)
+    precesion_scores.append(test_precision)
     recall_scores.append(test_recall)
     f1_scores.append(test_f1)
 
@@ -220,8 +227,16 @@ if use_test_data:
 
 # ------------------繪製結果折線圖-------------------
 if use_dev_data:
-    plt.plot(range(epochs+1), acc_scores, label='PRECISION')
-    plt.plot(range(epochs+1), recall_scores, label='RECALL')
-    plt.plot(range(epochs+1), f1_scores, label='F1')
+    custom_labels = ['epoch {}'.format(i) for i in range(epochs)]
+
+    if use_test_data:
+        custom_labels.append('test')
+
+    num_labels = len(custom_labels)  # 獲取 custom_labels 的大小
+
+    plt.plot(range(1, num_labels + 1), precesion_scores, label='PRECISION')
+    plt.plot(range(1, num_labels + 1), recall_scores, label='RECALL')
+    plt.plot(range(1, num_labels + 1), f1_scores, label='F1')
     plt.legend()
+    plt.xticks(range(1, num_labels + 1), custom_labels)
     plt.show()

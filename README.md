@@ -1,5 +1,14 @@
 # Semantic-Health-NER
 ## 環境建置
+
+**請確保你的Torch版本是2.0.1+cu118，否則可能會發生問題**
+
+下載指定torch版本：
+
+```shell
+pip install torch==2.0.1+cu118
+```
+
 下載`transformers`：
    ```shell
    pip install transformers

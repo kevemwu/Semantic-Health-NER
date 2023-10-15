@@ -221,7 +221,7 @@ def output_mistake_result(precision, recall, f1, mistake, mistake_num, result_pa
 
         result_data.append(result_item)
 
-    with open(result_path + file_name, 'w') as f:
+    with open(result_path + file_name, 'w', encoding='utf-8') as f:
         json.dump(result_data, f, indent=4, ensure_ascii=False)
 
 # 輸出correction_model需要的data
@@ -259,7 +259,7 @@ def output_correction_data(mistake, file_name):
 
     print(len(result_data))
     
-    with open(file_name, 'w') as f:
+    with open(file_name, 'w', encoding='utf-8') as f:  # 指定UTF-8编码
         json.dump(result_data, f, indent=4, ensure_ascii=False)
 
 # 輸出"{token}\t{label}\n"格式的檔案
